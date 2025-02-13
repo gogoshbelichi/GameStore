@@ -1,0 +1,25 @@
+GET http://localhost:5083/games
+###
+GET http://localhost:5083/games/0
+###
+POST http://localhost:5083/games
+Content-Type: application/json
+
+{
+  "name": "Minecraft",
+  "genre": "Sandbox",
+  "price": 19.99,
+  "releaseDate": "2011-11-18"
+}
+###
+PUT http://localhost:5083/games/0
+Content-Type: application/json
+
+{
+  "name": "Street Fighter 2",
+  "genre": "Fighter",
+  "price": 18.99,
+  "releaseDate": "1992-07-14"
+}
+###
+DELETE http://localhost:5083/games/2
