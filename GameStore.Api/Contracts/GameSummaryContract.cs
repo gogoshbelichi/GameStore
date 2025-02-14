@@ -1,6 +1,6 @@
 namespace GameStore.Api.Contracts;
 
-public record GameContract(
+public record GameSummaryContract(
     int Id,
     string Name,
     string Genre,

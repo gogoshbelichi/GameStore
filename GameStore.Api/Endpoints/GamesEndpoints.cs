@@ -10,93 +10,60 @@ namespace GameStore.Api.Endpoints;
 public static class GamesEndpoints
 {
     const string GetGameEndpointName = "GetGame";
-
-//list is not safe. it is not protected from simultaneous access.
-//so it's just a lesson case
-    static readonly List<GameContract> games =
-    [
-        new (
-            0,
-            "Street Fighter II",
-            "Fighter",
-            19.99M,
-            new DateOnly(1992, 07, 15)),
     
-        new (
-            1,
-            "Counter-Strike 2",
-            "FPS",
-            14.99M,
-            new DateOnly(2023, 09, 27)),
-    
-        new (
-            2,
-            "The Sims 4",
-            "Simulator",
-            24.99M,
-            new DateOnly(2014, 09, 2)),
-    
-        new (
-            3,
-            "Resident Evil 2: Remake",
-            "Survival Horror",
-            39.99M,
-            new DateOnly(2019, 08, 12))
-    ];
-
     public static RouteGroupBuilder MapGamesEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("games").WithParameterValidation();
         
         //get full list
-        group.MapGet("/", () => games);
+        group.MapGet("/", async (GameStoreContext dbContext) => await dbContext.Games
+            .Include(g => g.Genre)
+            .Select(game => game.ToGameSummaryContract())
+            .AsNoTracking()
+            .ToListAsync());
 
         //get one
-        group.MapGet("/{id:int}", (int id) =>
-            {
-                GameContract? game = games.Find(g => g.Id == id);
+        group.MapGet("/{id:int}", async (int id, GameStoreContext dbContext) => {
+                Game? game = await dbContext.Games.FindAsync(id);
     
-                return game is null ? Results.NotFound() : Results.Ok(game);
-            })
-            .WithName(GetGameEndpointName);
+                return game is null ?
+                    Results.NotFound() : Results.Ok(game.ToGameDetailsContract());
+        }).WithName(GetGameEndpointName);
 
         //create
-        group.MapPost("/", (CreateGameContract newGame, GameStoreContext dbContext) =>
+        group.MapPost("/", async (CreateGameContract newGame, GameStoreContext dbContext) =>
         {
             Game game = newGame.ToEntity();
-            game.Genre = dbContext.Genres.Find(newGame.GenreId);
             
             dbContext.Games.Add(game);
-            dbContext.SaveChanges();
+            await dbContext.SaveChangesAsync();
             
             return Results.CreatedAtRoute(GetGameEndpointName,
-                new { id = game.Id }, game.ToContract());
+                new { id = game.Id }, game.ToGameDetailsContract());
         });
 
         //update game info
-        group.MapPut("/{id:int}", (int id, UpdateGameContract updatedGame) =>
+        group.MapPut("/{id:int}", async (int id, UpdateGameContract updatedGame, GameStoreContext dbContext) =>
         {
-            var index = games.FindIndex(game => game.Id == id);
+            var existingGame = await dbContext.Games.FindAsync(id);
 
-            if (index == -1)
+            if (existingGame is null)
             {
                 return Results.NotFound();
             }
 
-            games[index] = new GameContract(
-                id,
-                updatedGame.Name,
-                updatedGame.Genre,
-                updatedGame.Price,
-                updatedGame.ReleaseDate);
-        
+            dbContext.Entry(existingGame)
+                .CurrentValues
+                .SetValues(updatedGame.ToEntity(id));
+            await dbContext.SaveChangesAsync();
+            
             return Results.NoContent();
         });
 
         //delete record
-        group.MapDelete("/{id:int}", (int id) =>
+        group.MapDelete("/{id:int}", async (int id, GameStoreContext dbContext) =>
         {
-            games.RemoveAll(g => g.Id == id);
+            await dbContext.Games.Where(g => g.Id == id).ExecuteDeleteAsync();
             return Results.NoContent();
         });
         
