@@ -5,4 +5,4 @@ public record GameContract(
     string Name,
     string Genre,
     decimal Price,
-    DateTime ReleaseDate);
+    DateOnly ReleaseDate);

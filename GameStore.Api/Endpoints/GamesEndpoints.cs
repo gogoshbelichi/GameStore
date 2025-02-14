@@ -1,4 +1,9 @@
 using GameStore.Api.Contracts;
+using GameStore.Api.Mapping;
+using GameStore.Domain.DbData;
+using GameStore.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
+
 
 namespace GameStore.Api.Endpoints;
 
@@ -15,28 +20,28 @@ public static class GamesEndpoints
             "Street Fighter II",
             "Fighter",
             19.99M,
-            new DateTime(1992, 07, 15)),
+            new DateOnly(1992, 07, 15)),
     
         new (
             1,
             "Counter-Strike 2",
             "FPS",
             14.99M,
-            new DateTime(2023, 09, 27)),
+            new DateOnly(2023, 09, 27)),
     
         new (
             2,
             "The Sims 4",
             "Simulator",
             24.99M,
-            new DateTime(2014, 09, 2)),
+            new DateOnly(2014, 09, 2)),
     
         new (
             3,
             "Resident Evil 2: Remake",
             "Survival Horror",
             39.99M,
-            new DateTime(2019, 08, 12))
+            new DateOnly(2019, 08, 12))
     ];
 
     public static RouteGroupBuilder MapGamesEndpoints(this WebApplication app)
@@ -56,19 +61,16 @@ public static class GamesEndpoints
             .WithName(GetGameEndpointName);
 
         //create
-        group.MapPost("/", (CreateGameContract newGame) =>
+        group.MapPost("/", (CreateGameContract newGame, GameStoreContext dbContext) =>
         {
-            GameContract game = new(
-                games.Count,
-                newGame.Name,
-                newGame.Genre,
-                newGame.Price,
-                newGame.ReleaseDate
-            );
-            games.Add(game);
-    
+            Game game = newGame.ToEntity();
+            game.Genre = dbContext.Genres.Find(newGame.GenreId);
+            
+            dbContext.Games.Add(game);
+            dbContext.SaveChanges();
+            
             return Results.CreatedAtRoute(GetGameEndpointName,
-                new { id = game.Id }, game);
+                new { id = game.Id }, game.ToContract());
         });
 
         //update game info
